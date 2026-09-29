@@ -6,9 +6,11 @@ Shaxsiy budget ilovasi: daromad, xarajat, oylik budget, kartalar, qarzlar, emerg
 - Ma’lumotlar faqat telefonda saqlanadi (`localStorage`) — server, login, tashqi kutubxona yo‘q
 - Hech qanday summa kodda yo‘q: hammasi ilova ichida kiritiladi va o‘zgartiriladi
 
+**Ilova:** https://mirfayzlutfullayev.github.io/budget/
+
 ## iPhone’ga o‘rnatish
 
-1. Safari’da ilova manzilini oching
+1. Safari’da https://mirfayzlutfullayev.github.io/budget/ ni oching
 2. Pastdagi **Ulashish** (⬆︎) → **Add to Home Screen / На экран «Домой»**
 3. Ekrandagi **Budget** ikonkasidan oching
 

@@ -1,6 +1,6 @@
 // Oflayn ishlash: ilova fayllari keshga saqlanadi.
 // Yangi versiya chiqarilganda VERSION'ni oshiring.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `budget-${VERSION}`;
 const FILES = [
   './',
