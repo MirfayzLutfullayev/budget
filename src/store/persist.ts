@@ -27,10 +27,17 @@ export interface Snapshot {
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
+/** IndexedDB javob bermay qolgan bo'lsa (masalan, boshqa oyna bloklagan). */
+let idbTimedOut = false;
+const OPEN_TIMEOUT_MS = 5000;
 
 function openDB(): Promise<IDBDatabase | null> {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise(resolve => {
+  dbPromise = new Promise(res => {
+    let settled = false;
+    const resolve = (db: IDBDatabase | null) => { if (!settled) { settled = true; clearTimeout(timer); res(db); } };
+    // Hech qachon abadiy kutib qolmaslik uchun
+    const timer = setTimeout(() => { idbTimedOut = true; dbPromise = null; resolve(null); }, OPEN_TIMEOUT_MS);
     try {
       if (typeof indexedDB === 'undefined') return resolve(null);
       const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -85,6 +92,12 @@ export interface LoadResult {
 export async function loadState(): Promise<LoadResult> {
   const fromIdb = (await tx<unknown>('kv', 'readonly', s => s.get('state')).catch(() => undefined)) as State | undefined;
   const fromLs = readLocal(LS_KEY) as State | null;
+
+  // IndexedDB javob bermadi va zaxira ko'zgu ham bo'sh — asosiy ma'lumot IndexedDB'da qolgan bo'lishi mumkin.
+  // Bo'sh holat bilan ochsak, keyingi saqlash uni ustidan yozib yuboradi. Shuning uchun to'xtaymiz.
+  if (!fromIdb && idbTimedOut && !fromLs) {
+    throw new Error('Ma’lumotlar bazasi javob bermadi. Boshqa oynada ochiq bo‘lsa, yoping va qayta urinib ko‘ring.');
+  }
 
   const candidates = [
     fromIdb && { state: fromIdb, source: 'indexeddb' as const },
