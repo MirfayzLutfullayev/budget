@@ -1,0 +1,8 @@
+{
+  "name": "budget-manager-pwa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/finance.test.js"
+  }
+}
