@@ -24,7 +24,7 @@ export function Stats() {
         <Card><p className="text-[13px] font-semibold text-slate-500">Kirim</p><p className="tabular text-2xl font-extrabold text-emerald-600">{short(t.income)}</p></Card>
         <Card><p className="text-[13px] font-semibold text-slate-500">Chiqim</p><p className="tabular text-2xl font-extrabold text-rose-600">{short(t.expenses)}</p></Card>
         <Card>
-          <p className="text-[13px] font-semibold text-slate-500">{b.overspent > 0 ? 'Oshib ketdi' : 'Tejaldi'}</p>
+          <p className="text-[13px] font-semibold text-slate-500">{b.overspent > 0 ? 'Oshib ketdi' : month < currentMonth() ? 'Tejaldi' : 'Budjetdan qoldi'}</p>
           <p className={`tabular text-2xl font-extrabold ${b.overspent > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{b.overspent > 0 ? `−${short(b.overspent)}` : `+${short(b.saved)}`}</p>
         </Card>
         <Card><p className="text-[13px] font-semibold text-slate-500">Qarz to‘landi</p><p className="tabular text-2xl font-extrabold text-orange-600">{short(t.debtPaid)}</p></Card>
@@ -89,7 +89,7 @@ export function Stats() {
                 <Tooltip formatter={tip} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="Budjet" fill="#c7d2fe" radius={[0, 6, 6, 0]} />
-                <Bar dataKey="Haqiqiy" radius={[0, 6, 6, 0]}>
+                <Bar dataKey="Haqiqiy" fill="#6366f1" radius={[0, 6, 6, 0]}>
                   {bva.map(r => <Cell key={r.name} fill={r.Haqiqiy > r.Budjet ? '#f43f5e' : '#6366f1'} />)}
                 </Bar>
               </BarChart>

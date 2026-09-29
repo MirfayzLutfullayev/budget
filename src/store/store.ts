@@ -30,6 +30,7 @@ export const isLoaded = () => loaded;
 
 let saveChain: Promise<unknown> = Promise.resolve();
 let lastSaveFailed = false;
+let lastSnapshotDay = '';
 
 function persist(next: State) {
   saveChain = saveChain.then(() => saveState(next)).then(err => {
@@ -37,6 +38,11 @@ function persist(next: State) {
       showToast('⚠️ Saqlab bo‘lmadi! Telefon xotirasini tekshiring va zaxira nusxa oling.', 'danger', 8000);
     }
     lastSaveFailed = !!err;
+    // Kunlik avtomatik nusxa — ilova yopilmasdan ham (kuniga bir marta)
+    if (!err && lastSnapshotDay !== today() && (next.transactions.length > 0 || next.accounts.length > 0)) {
+      lastSnapshotDay = today();
+      return ensureDailySnapshot(next);
+    }
   });
 }
 

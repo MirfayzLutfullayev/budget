@@ -240,8 +240,10 @@ export class Ledger {
     return Array.from({ length: months }, (_, i) => {
       const m = addMonths(key, i - months + 1);
       const t = this.monthTotals(m);
-      return { key: m, label: monthShort(m), income: t.income, expenses: t.expenses, debtPaid: t.debtPaid,
-        debt: this.debtAt(monthDate(m, daysInMonth(m))) };
+      // Birinchi qarz qo'shilishidan oldingi oylar grafikda ko'rsatilmaydi (0 emas — ma'lumot yo'q)
+      const firstDebt = this.s.debts.map(d => d.startDate).sort()[0];
+      const debt = firstDebt && monthDate(m, daysInMonth(m)) >= firstDebt ? this.debtAt(monthDate(m, daysInMonth(m))) : null;
+      return { key: m, label: monthShort(m), income: t.income, expenses: t.expenses, debtPaid: t.debtPaid, debt };
     });
   }
 
