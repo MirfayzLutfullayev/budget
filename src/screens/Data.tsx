@@ -70,7 +70,7 @@ export function Reports() {
 
 const REASON: Record<Snapshot['reason'], string> = {
   daily: 'Kunlik avtomatik', manual: 'Qo‘lda', 'before-import': 'Tiklashdan oldin', 'before-restore': 'Tiklashdan oldin',
-  'before-reset': 'O‘chirishdan oldin', 'v1-archive': '1-versiya arxivi',
+  'before-reset': 'O‘chirishdan oldin', 'before-setup': 'Rejani qo‘llashdan oldin', 'v1-archive': '1-versiya arxivi',
 };
 
 export function DataPage() {

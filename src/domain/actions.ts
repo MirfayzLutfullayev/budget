@@ -305,7 +305,7 @@ export function saveBill(s: State, input: Omit<Bill, 'id' | 'isActive'> & { id?:
   const existing = byId(s.bills, input.id);
   const data = { ...input, name: input.name.trim(), isActive: input.isActive ?? true };
   if (existing) { Object.assign(existing, data); return existing; }
-  const b: Bill = { ...data, id: uid() };
+  const b: Bill = { ...data, id: uid(), startDate: data.startDate ?? today() };
   s.bills.push(b);
   return b;
 }

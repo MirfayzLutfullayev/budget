@@ -51,7 +51,9 @@ export type SheetSpec =
   | { type: 'bill'; id?: ID }
   | { type: 'payBill'; id: ID }
   | { type: 'safeToSpend' }
-  | { type: 'categoryTx'; categoryId: ID; month: string };
+  | { type: 'categoryTx'; categoryId: ID; month: string }
+  | { type: 'plan' }
+  | { type: 'distribute' };
 
 const sheets = createStore<SheetSpec[]>([]);
 export const useSheets = () => useSyncExternalStore(sheets.subscribe, sheets.get, sheets.get);

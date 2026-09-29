@@ -8,7 +8,7 @@ import type { ID } from '../domain/types';
 
 type Filter = 'all' | 'income' | 'expense' | 'transfer';
 
-interface Item { key: string; date: string; created: number; icon: string; title: string; subtitle: string; amount: number; tone: 'green' | 'red' | 'slate'; open: () => void }
+interface Item { key: string; date: string; created: number; icon: string; title: string; subtitle: string; amount: number; tone: 'green' | 'red' | 'slate'; open: () => void; flag?: 'violation' | 'foreign' }
 
 export function buildItems(L: Ledger, month: string, filter: Filter, accountId?: ID): Item[] {
   const items: Item[] = [];
@@ -27,6 +27,7 @@ export function buildItems(L: Ledger, month: string, filter: Filter, accountId?:
         subtitle: [L.account(t.accountId)?.name, t.note].filter(Boolean).join(' · '),
         amount: t.type === 'income' ? t.amount : -t.amount,
         tone: t.type === 'income' ? 'green' : 'red',
+        flag: L.isViolation(t) ? 'violation' : L.isForeignCard(t) ? 'foreign' : undefined,
         open: () => openSheet(t.type === 'income' ? { type: 'income', id: t.id } : { type: 'expense', id: t.id }),
       });
     }
@@ -67,7 +68,7 @@ export function ItemList({ items }: { items: Item[] }) {
                 <button key={i.key} onClick={i.open} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-slate-50 dark:active:bg-zinc-800">
                   <span className="flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-slate-100 text-xl dark:bg-zinc-800">{i.icon}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{i.title}</span>
+                    <span className="block truncate font-medium">{i.title}{i.flag === 'violation' && <span className="ml-2 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">qoida!</span>}{i.flag === 'foreign' && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">boshqa karta</span>}</span>
                     {i.subtitle && <span className="block truncate text-[13px] text-slate-500">{i.subtitle}</span>}
                   </span>
                   <span className={cx('tabular flex-none text-[17px] font-bold',

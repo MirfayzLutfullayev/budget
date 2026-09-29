@@ -24,6 +24,16 @@ Shaxsiy kirim-chiqim va budjet ilovasi (PWA).
 - **Eslatmalar:** ilova ichida + iPhone **Kalendariga** (.ics) — ilova yopiq bo‘lsa ham telefon eslatadi
 - **Qanday hisoblanadi:** barcha qoidalar sizning raqamlaringiz bilan
 
+## Kartalar bo‘yicha taqsimot (konvertlar)
+
+- **Mening rejam** (Ko‘proq → Mening rejam): har bir karta vazifasi, oylik ulushi va kategoriyalari. Mavjud kartalar/kategoriyalar nomi bo‘yicha topiladi va qayta ishlatiladi — hech narsa o‘chmaydi, oldin avtomatik nusxa olinadi.
+- **Qat’iy karta** (masalan TBC — ovqat, yo‘l, telefon; 6418 — kurs, ijara, kiyim): boshqa narsaga ishlatilsa — formada, Dashboard’da, tarixda va eslatmalarda qizil ogohlantirish.
+- **Erkin karta** (Main, naqd): istalgan xarajat.
+- Kategoriya tanlanganda uning kartasi avtomatik tanlanadi.
+- **Taqsimlash:** maosh tushgach bir bosishda kartalarga o‘tkazma (xarajat emas).
+- Dashboard’da har bir karta: limit, sarflangan, qolgan, kuniga qancha mumkin, shu tempda oy oxiri prognozi.
+- **Kunlik limit:** bugun va birinchi yozuvdan beri reja bilan solishtirish.
+
 ## Ma’lumotlarni yo‘qotmaslik
 
 | Himoya | Nima qiladi |

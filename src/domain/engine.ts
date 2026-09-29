@@ -209,6 +209,8 @@ export class Ledger {
     const items: RequiredItem[] = [];
     for (const b of this.s.bills) {
       if (!b.isActive || b.amount <= 0 || this.isBillPaid(b.id, key)) continue;
+      // Qo'shilishidan oldingi sana — bu oy uchun talab qilinmaydi (ehtimol allaqachon to'langan)
+      if (b.startDate && monthDate(key, b.day) < b.startDate) continue;
       items.push({ kind: 'bill', id: b.id, name: b.name, amount: b.amount, date: monthDate(key, b.day) });
     }
     for (const d of this.activeDebts) {
@@ -264,6 +266,116 @@ export class Ledger {
       .sort((a, b) => b.amount - a.amount);
   }
 
+  // ---------- Karta qoidalari ----------
+
+  /** Kartaga biriktirilgan kategoriyalar. */
+  cardCategories(accountId: ID) {
+    return this.sorted(this.s.categories.filter(c => c.type === 'expense' && c.accountId === accountId && c.isActive));
+  }
+
+  /**
+   * Qoida buzilishi: qat'iy kartadan unga biriktirilmagan narsaga pul ketgan.
+   * Masalan, TBC (faqat ovqat, yo'l, telefon) dan kiyim olindi.
+   */
+  isViolation(t: Transaction): boolean {
+    if (t.type !== 'expense') return false;
+    const acc = this.account(t.accountId);
+    if (!acc?.strict) return false;
+    return this.category(t.categoryId)?.accountId !== acc.id;
+  }
+
+  /** Kategoriya o'z kartasidan emas, boshqa kartadan to'langan (ogohlantirish, qoida buzilishi emas). */
+  isForeignCard(t: Transaction): boolean {
+    if (t.type !== 'expense' || this.isViolation(t)) return false;
+    const home = this.category(t.categoryId)?.accountId;
+    return !!home && !!t.accountId && home !== t.accountId && !!this.account(home)?.isActive;
+  }
+
+  violations(key: string) {
+    return this.txInMonth(key).filter(t => this.isViolation(t)).sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  /** Karta konverti holati: limit, sarflangan, qolgan, kunlik ruxsat, oy oxiri prognozi. */
+  cardStatus(a: Account, key: string, todayStr: string) {
+    const cats = this.cardCategories(a.id);
+    const month = this.txInMonth(key);
+    const isCurrent = key === monthOf(todayStr);
+    const days = daysInMonth(key);
+    const day = isCurrent ? Number(todayStr.slice(8, 10)) : days;
+    const daysLeft = isCurrent ? Math.max(1, days - day + 1) : 0;
+
+    const rows = cats.map(c => {
+      const list = month.filter(t => t.type === 'expense' && t.categoryId === c.id);
+      const actual = sum(list, t => t.amount);
+      const limit = c.kind === 'regular' ? this.limit(c, key) : 0;
+      const todaySpent = sum(list.filter(t => t.date === todayStr), t => t.amount);
+      return { category: c, limit, actual, left: Math.max(0, limit - actual), over: Math.max(0, actual - limit),
+        ratio: limit > 0 ? actual / limit : 0, today: todaySpent, dailyLimit: c.dailyLimit || 0 };
+    });
+
+    const limitTotal = sum(rows, r => r.limit);
+    const spent = sum(rows.filter(r => r.category.kind === 'regular'), r => r.actual);
+    const saved = sum(rows.filter(r => r.category.kind === 'savings'), r => r.actual);
+    const left = limitTotal - spent;
+    const plan = a.plan || 0;
+    const funded = sum(this.s.transfers.filter(t => t.toAccountId === a.id && monthOf(t.date) === key), t => t.amount)
+      + sum(month.filter(t => t.type === 'income' && t.accountId === a.id), t => t.amount);
+    const projected = isCurrent && day > 0 ? Math.round((spent / day) * days) : spent;
+
+    return {
+      account: a,
+      rows,
+      plan,
+      funded,
+      limitTotal,
+      spent,
+      saved,
+      left,
+      over: Math.max(0, spent - limitTotal),
+      ratio: limitTotal > 0 ? spent / limitTotal : 0,
+      balance: this.balance(a),
+      daysLeft,
+      perDay: daysLeft > 0 ? Math.max(0, Math.floor(left / daysLeft)) : 0,
+      projected,
+      projectedOver: isCurrent && limitTotal > 0 ? Math.max(0, projected - limitTotal) : 0,
+      violations: month.filter(t => t.accountId === a.id && this.isViolation(t)),
+      foreign: month.filter(t => this.isForeignCard(t) && this.category(t.categoryId)?.accountId === a.id),
+    };
+  }
+
+  /** Dashboard uchun: vazifasi yoki kategoriyasi bor faol kartalar. */
+  cardStatuses(key: string, todayStr: string) {
+    return this.activeAccounts
+      .filter(a => a.plan || a.strict || a.purpose || this.cardCategories(a.id).length)
+      .map(a => this.cardStatus(a, key, todayStr));
+  }
+
+  /** Kunlik limitli kategoriyalar: bugun va oy boshidan beri reja bilan solishtirish. */
+  dailyStatus(todayStr: string) {
+    const key = monthOf(todayStr);
+    const day = Number(todayStr.slice(8, 10));
+    return this.expenseCategories.filter(c => (c.dailyLimit || 0) > 0).map(c => {
+      const list = this.txInMonth(key).filter(t => t.type === 'expense' && t.categoryId === c.id);
+      const today = sum(list.filter(t => t.date === todayStr), t => t.amount);
+      const mtd = sum(list.filter(t => t.date <= todayStr), t => t.amount);
+      // Reja birinchi yozuvdan boshlab hisoblanadi (ilova oy o'rtasida boshlangan bo'lsa ham to'g'ri chiqadi)
+      const first = list.map(t => t.date).filter(x => x <= todayStr).sort()[0];
+      const days = first ? day - Number(first.slice(8, 10)) + 1 : 1;
+      const expected = (c.dailyLimit || 0) * days;
+      return { category: c, dailyLimit: c.dailyLimit || 0, today, mtd, expected, diff: mtd - expected, day: days };
+    });
+  }
+
+  /** Oylik taqsimlash: qaysi kartaga hali qancha o'tkazilishi kerak. */
+  distributionPlan(key: string, fromId: ID | null) {
+    return this.activeAccounts
+      .filter(a => (a.plan || 0) > 0 && a.id !== fromId)
+      .map(a => {
+        const sent = sum(this.s.transfers.filter(t => t.toAccountId === a.id && monthOf(t.date) === key), t => t.amount);
+        return { account: a, plan: a.plan || 0, sent, due: Math.max(0, (a.plan || 0) - sent) };
+      });
+  }
+
   // ---------- Eslatmalar ----------
 
   reminders(todayStr: string): Reminder[] {
@@ -303,6 +415,32 @@ export class Ledger {
     }
 
     const key = monthOf(todayStr);
+
+    // Karta qoidalari buzilishi — eng muhim ogohlantirish
+    for (const t of this.violations(key)) {
+      const acc = this.account(t.accountId)!;
+      const allowed = this.cardCategories(acc.id).map(c => c.name).join(', ') || 'hech narsa biriktirilmagan';
+      list.push({ id: `viol-${t.id}`, level: 'danger', icon: '🚫',
+        title: `${acc.name}: qoida buzildi — ${this.category(t.categoryId)?.name ?? 'kategoriyasiz'} ${plain(t.amount)}`,
+        detail: `Bu karta faqat: ${allowed}`, action: { type: 'budget' } });
+    }
+
+    for (const d of this.dailyStatus(todayStr)) {
+      if (d.today > d.dailyLimit) {
+        list.push({ id: `day-${d.category.id}`, level: 'warn', icon: '📅', title: `${d.category.name}: bugun ${plain(d.today)} / ${plain(d.dailyLimit)}`,
+          detail: `Kunlik limitdan ${plain(d.today - d.dailyLimit)} oshdi` });
+      }
+    }
+
+    for (const c of this.cardStatuses(key, todayStr)) {
+      if (c.over > 0) {
+        list.push({ id: `card-over-${c.account.id}`, level: 'danger', icon: '💳', title: `${c.account.name}: limitdan ${plain(c.over)} oshdi`, action: { type: 'budget' } });
+      } else if (c.projectedOver > 0) {
+        list.push({ id: `card-pace-${c.account.id}`, level: 'warn', icon: '📈', title: `${c.account.name}: shu tempda oy oxiriga ${plain(c.projectedOver)} yetmaydi`,
+          detail: `Kuniga ${plain(c.perDay)} dan oshirmang` });
+      }
+    }
+
     for (const r of this.budgetRows(key)) {
       if (r.limit <= 0) continue;
       if (r.actual > r.limit) {

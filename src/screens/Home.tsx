@@ -4,6 +4,7 @@ import { Screen, Card, CardTitle, Progress, budgetTone, Button, cx, IconButton }
 import { currencySymbol, currentMonth, dayTitle, monthTitle, plain, short, today } from '../lib/format';
 import type { Reminder } from '../domain/engine';
 import { runReminderAction } from './reminderActions';
+import { CardEnvelope, DailyCard, DistributeCTA, PlanCTA } from './Cards';
 
 export function Home() {
   const L = useLedger();
@@ -15,6 +16,8 @@ export function Home() {
   const budget = L.budgetSummary(key);
   const coming = L.comingSoon(t);
   const reminders = L.reminders(t);
+  const cards = L.cardStatuses(key, t);
+  const violations = L.violations(key);
   const isStandalone = (navigator as Navigator & { standalone?: boolean }).standalone || matchMedia('(display-mode: standalone)').matches;
 
   return (
@@ -27,7 +30,15 @@ export function Home() {
         </div>
       )}
 
+      {violations.length > 0 && (
+        <button onClick={() => push({ name: 'reminders' })} className="block w-full rounded-3xl bg-rose-600 p-4 text-left text-white shadow-lg shadow-rose-600/30">
+          <p className="text-[15px] font-extrabold">🚫 Karta qoidasi buzildi: {violations.length} ta · {plain(violations.reduce((x, v) => x + v.amount, 0))}</p>
+          <p className="mt-0.5 text-[13px] text-white/90">{violations.slice(0, 2).map(v => `${L.account(v.accountId)?.name} → ${L.category(v.categoryId)?.name ?? '?'} ${short(v.amount)}`).join(' · ')}</p>
+        </button>
+      )}
+
       {/* TOTAL MONEY */}
+
       <Card className="bg-gradient-to-br from-sky-500 to-blue-700 !text-white shadow-lg shadow-blue-500/20 dark:bg-gradient-to-br" onClick={() => push({ name: 'accounts' })}>
         <p className="text-[13px] font-bold uppercase tracking-wider text-white/80">💰 Total Money</p>
         <p className="tabular mt-1 text-[38px] font-extrabold leading-tight">{plain(L.totalMoney)} <span className="text-lg font-bold opacity-80">{currencySymbol()}</span></p>
@@ -55,7 +66,22 @@ export function Home() {
         )}
       </Card>
 
+      {/* KARTALAR BO'YICHA TAQSIMOT */}
+      {cards.length === 0 && s.accounts.length > 0 && <PlanCTA />}
+      <DistributeCTA L={L} />
+      <DailyCard L={L} />
+      {cards.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-[13px] font-bold uppercase tracking-wider text-slate-500">💳 Kartalar</h2>
+            <button className="text-[13px] font-semibold text-indigo-600 dark:text-indigo-400" onClick={() => openSheet({ type: 'plan' })}>Reja ›</button>
+          </div>
+          {cards.map(st => <CardEnvelope key={st.account.id} st={st} L={L} />)}
+        </section>
+      )}
+
       {/* INCOME / EXPENSES */}
+
       <div className="grid grid-cols-2 gap-3">
         <Card onClick={() => go('transactions')}>
           <p className="text-[13px] font-semibold text-slate-500">Kirim</p>

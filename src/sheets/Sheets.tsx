@@ -1,25 +1,26 @@
 import { useState } from 'react';
 import type { Account, Category, ID, State } from '../domain/types';
-import type { Ledger } from '../domain/engine';
+import { Ledger } from '../domain/engine';
 import * as A from '../domain/actions';
-import { commit, useLedger } from '../store/store';
+import { commit, getState, useLedger } from '../store/store';
 import { closeSheet, openSheet, replaceSheet, showToast, useSheets, type SheetSpec } from '../store/ui';
 import { Sheet } from '../ui/Sheet';
+import { DistributeSheet, PlanSheet } from './PlanSheets';
 import { Button, Pill, Row, cx } from '../ui/kit';
 import {
   AccountChips, AmountField, AmountInput, CategoryChips, DateInput, ErrorBox, Field, FieldGroup, Hint, Select, TextInput, Toggle,
 } from '../ui/form';
-import { currentMonth, dayTitle, fullDate, money, monthTitle, plain, relativeDay, sum, today } from '../lib/format';
+import { currentMonth, dayTitle, fullDate, money, monthOf, monthTitle, plain, relativeDay, sum, today } from '../lib/format';
 
 // ---------- Umumiy ----------
 
 function useSubmit() {
   const [error, setError] = useState('');
-  const submit = (fn: (s: State) => void, message = 'Saqlandi ✓') => {
+  const submit = (fn: (s: State) => void, message = 'Saqlandi ✓', tone: 'success' | 'danger' = 'success') => {
     try {
       commit(fn);
       closeSheet();
-      if (message) showToast(message);
+      if (message) showToast(message, tone, tone === 'danger' ? 5000 : 2400);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -115,7 +116,10 @@ function ExpenseForm({ id, categoryId: initialCat }: { id?: ID; categoryId?: ID 
   const tx = id ? L.s.transactions.find(t => t.id === id) : undefined;
   const [amount, setAmount] = useState(tx?.amount ?? 0);
   const [categoryId, setCategoryId] = useState<ID | null>(tx?.categoryId ?? initialCat ?? null);
-  const [accountId, setAccountId] = useState<ID | null>(tx?.accountId ?? lastAccount(L, 'expense'));
+  const homeOf = (cid: ID | null | undefined) => { const h = L.category(cid)?.accountId; return h && L.account(h)?.isActive ? h : null; };
+  const [accountId, setAccountId] = useState<ID | null>(tx?.accountId ?? homeOf(initialCat) ?? lastAccount(L, 'expense'));
+  // Kategoriya tanlanganda — uning kartasi avtomatik tanlanadi
+  const pickCategory = (cid: ID) => { setCategoryId(cid); const h = homeOf(cid); if (h) setAccountId(h); };
   const [date, setDate] = useState(tx?.date ?? today());
   const [note, setNote] = useState(tx?.note ?? '');
   const { error, submit, remove } = useSubmit();
@@ -125,20 +129,50 @@ function ExpenseForm({ id, categoryId: initialCat }: { id?: ID; categoryId?: ID 
   const current = L.category(categoryId);
   if (current && !cats.includes(current) && current.kind !== 'debt') cats.unshift(current);
 
+  const acc = L.account(accountId);
+  const violation = !!acc?.strict && !!current && current.accountId !== acc.id;
+  const home = L.account(current?.accountId);
+  const foreign = !violation && !!home && home.isActive && !!accountId && home.id !== accountId;
+  const allowed = acc ? L.cardCategories(acc.id).map(c => c.name).join(', ') : '';
+  const key = monthOf(date);
+  const catLimit = current && current.kind === 'regular' ? L.limit(current, key) : 0;
+  const catSpent = current ? L.categoryActual(current.id, key) - (tx && tx.categoryId === current.id && monthOf(tx.date) === key ? tx.amount : 0) : 0;
+  const catToday = current ? sum(L.s.transactions.filter(t => t.categoryId === current.id && t.date === today() && t.id !== id), t => t.amount) : 0;
+  const after = catSpent + amount;
+
   const save = () => submit(s => {
     A.saveTransaction(s, { ...(tx ?? {}), id, type: 'expense', amount, categoryId, accountId, date, note });
-  }, id ? 'Saqlandi ✓' : `−${plain(amount)} ${current ? current.name : ''} ✓`);
+  }, violation ? `🚫 Qoida buzildi: ${acc?.name} kartasidan ${current?.name}` : id ? 'Saqlandi ✓' : `−${plain(amount)} ${current ? current.name : ''} ✓`, violation ? 'danger' : 'success');
 
   return (
     <Sheet title={debt ? `Qarz to‘lovi: ${debt.name}` : id ? 'Chiqimni tahrirlash' : 'Chiqim'} footer={<SaveButton onClick={save} />}>
       <AmountInput value={amount} onChange={setAmount} autoFocus={!id} />
-      {!debt && <CategoryChips categories={cats} value={categoryId} onChange={setCategoryId} />}
+      {!debt && <CategoryChips categories={cats} value={categoryId} onChange={pickCategory} />}
+      {current && !debt && (catLimit > 0 || (current.dailyLimit ?? 0) > 0) && (
+        <div className="rounded-2xl bg-white px-4 py-3 text-[14px] shadow-card dark:bg-zinc-900">
+          {catLimit > 0 && (
+            <div className="flex justify-between"><span className="text-slate-500">{current.name}: oyga</span>
+              <span className={cx('tabular font-semibold', after > catLimit ? 'text-rose-600' : 'text-emerald-600')}>
+                {after > catLimit ? `+${plain(after - catLimit)} oshadi` : `qoladi ${plain(catLimit - after)}`}</span></div>
+          )}
+          {(current.dailyLimit ?? 0) > 0 && date === today() && (
+            <div className="flex justify-between"><span className="text-slate-500">Bugun</span>
+              <span className={cx('tabular font-semibold', catToday + amount > (current.dailyLimit ?? 0) ? 'text-rose-600' : '')}>{plain(catToday + amount)} / {plain(current.dailyLimit ?? 0)}</span></div>
+          )}
+        </div>
+      )}
       {L.activeAccounts.length ? (
         <div>
           <p className="mb-2 ml-1 text-[13px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Qaysi hisobdan</p>
           <AccountChips accounts={L.activeAccounts} value={accountId} onChange={setAccountId} balances={a => L.balance(a)} />
         </div>
       ) : <NoAccounts />}
+      {violation && (
+        <p className="rounded-2xl bg-rose-600 px-4 py-3 text-[15px] font-semibold text-white">
+          🚫 {acc?.name} kartasi faqat: {allowed || 'hech narsa biriktirilmagan'}. {current?.name} uchun bu kartadan ishlatish — qoida buzilishi.
+        </p>
+      )}
+      {foreign && <p className="rounded-2xl bg-amber-50 px-4 py-3 text-[14px] text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">⚠️ {current?.name} odatda <b>{home?.name}</b> kartasidan to‘lanadi.</p>}
       <MoreFields date={date} setDate={setDate} note={note} setNote={setNote} />
       <ErrorBox error={error} />
       {id && <Button tone="danger" className="w-full" onClick={() => remove(s => A.deleteTransaction(s, id), 'Chiqim o‘chirildi')}>O‘chirish</Button>}
@@ -298,11 +332,15 @@ function AccountForm({ id }: { id?: ID }) {
   const [balance, setBalance] = useState(a?.initialBalance ?? 0);
   const [last4, setLast4] = useState(a?.last4 ?? '');
   const [active, setActive] = useState(a?.isActive ?? true);
+  const [purpose, setPurpose] = useState(a?.purpose ?? '');
+  const [plan, setPlan] = useState(a?.plan ?? 0);
+  const [strict, setStrict] = useState(a?.strict ?? false);
+  const cardCats = id ? L.cardCategories(id) : [];
   const { error, submit, remove } = useSubmit();
   const used = id ? A.isAccountUsed(L.s, id) : false;
 
   const save = () => submit(s => {
-    A.saveAccount(s, { id, name, type, initialBalance: balance, last4, isActive: active,
+    A.saveAccount(s, { id, name, type, initialBalance: balance, last4, isActive: active, purpose: purpose.trim(), plan, strict,
       icon: type === 'cash' ? '💵' : type === 'card' ? '💳' : '🏦' });
   });
 
@@ -322,6 +360,12 @@ function AccountForm({ id }: { id?: ID }) {
         <Field label={used ? 'Boshlang‘ich balans' : 'Hozirgi balans'}><AmountField value={balance} onChange={setBalance} /></Field>
         {a && <Toggle label="Faol" hint="Faol emas hisob Total Money’ga kirmaydi" checked={active} onChange={setActive} />}
       </FieldGroup>
+      <FieldGroup title="Karta vazifasi">
+        <Field label="Nima uchun"><TextInput value={purpose} onChange={setPurpose} placeholder="Oziq-ovqat, yo‘l, telefon" /></Field>
+        <Field label="Oyiga o‘tkaziladi"><AmountField value={plan} onChange={setPlan} placeholder="reja yo‘q" /></Field>
+        <Toggle label="Faqat o‘z kategoriyalari uchun" hint="Boshqa narsaga ishlatilsa — qizil ogohlantirish" checked={strict} onChange={setStrict} />
+      </FieldGroup>
+      {a && <Hint>Biriktirilgan kategoriyalar: {cardCats.length ? cardCats.map(x => `${x.icon} ${x.name}`).join(', ') : 'yo‘q'}. Kategoriyani kartaga biriktirish: Ko‘proq → Kategoriyalar.</Hint>}
       <Hint>
         {a ? `Joriy balans: ${money(L.balance(a))}. ` : ''}Keyingi balans kirim, chiqim, o‘tkazma va qarz to‘lovlaridan avtomatik hisoblanadi. To‘liq karta raqami saqlanmaydi.
       </Hint>
@@ -346,13 +390,16 @@ function CategoryForm({ id, incomeType }: { id?: ID; incomeType?: boolean }) {
   const [newGroup, setNewGroup] = useState('');
   const [kind, setKind] = useState(c?.kind ?? 'regular');
   const [limit, setLimit] = useState(c?.monthlyLimit ?? 0);
+  const [cardId, setCardId] = useState<string>(c?.accountId ?? '');
+  const [daily, setDaily] = useState(c?.dailyLimit ?? 0);
   const [active, setActive] = useState(c?.isActive ?? true);
   const { error, submit, remove } = useSubmit();
   const used = id ? A.isCategoryUsed(L.s, id) : false;
 
   const save = () => submit(s => {
     A.saveCategory(s, { id, name, icon: [...icon.trim()][0] ?? '📁', group: group === '__new' ? (newGroup.trim() || 'Boshqa') : group,
-      type, kind, monthlyLimit: kind === 'regular' && type === 'expense' ? limit : 0, isActive: active });
+      type, kind, monthlyLimit: kind === 'regular' && type === 'expense' ? limit : 0, isActive: active,
+      accountId: type === 'expense' ? cardId || null : null, dailyLimit: type === 'expense' && kind === 'regular' ? daily : 0 });
   });
 
   return (
@@ -366,6 +413,8 @@ function CategoryForm({ id, incomeType }: { id?: ID; incomeType?: boolean }) {
           <Field label="Turi"><Select value={kind} onChange={setKind} options={[['regular', 'Oddiy xarajat'], ['savings', 'Jamg‘arma']]} /></Field>
         )}
         {type === 'expense' && kind === 'regular' && <Field label="Oylik limit"><AmountField value={limit} onChange={setLimit} placeholder="limitsiz" /></Field>}
+        {type === 'expense' && kind === 'regular' && <Field label="Kunlik limit"><AmountField value={daily} onChange={setDaily} placeholder="yo‘q" /></Field>}
+        {type === 'expense' && <Field label="Qaysi kartadan"><Select value={cardId} onChange={setCardId} options={[['', 'Istalgan'], ...L.activeAccounts.map(a => [a.id, `${a.icon} ${a.name}`] as [string, string])]} /></Field>}
         <Toggle label="Faol" checked={active} onChange={setActive} />
       </FieldGroup>
       {kind === 'debt' && <Hint>Bu tizim kategoriyasi — qarz to‘lovlari shu yerga yoziladi.</Hint>}
@@ -598,9 +647,19 @@ function ReceiveForm({ id }: { id: ID }) {
   const [amount, setAmount] = useState(x.amount);
   const [accountId, setAccountId] = useState<ID | null>(x.targetAccountId ?? lastAccount(L, 'income'));
   const [date, setDate] = useState(today());
-  const { error, submit } = useSubmit();
+  const [error, setReceiveError] = useState('');
 
-  const save = () => submit(s => A.receiveIncome(s, id, { amount, accountId, date }), `+${plain(amount)} tushdi ✓`);
+  const save = () => {
+    try {
+      commit(s => { A.receiveIncome(s, id, { amount, accountId, date }); });
+      showToast(`+${plain(amount)} tushdi ✓`);
+      // Maosh tushdi — kartalarga taqsimlash kerak bo'lsa, darhol taklif qilamiz
+      const due = new Ledger(getState()).distributionPlan(monthOf(date), accountId).some(r => r.due > 0);
+      if (due) replaceSheet({ type: 'distribute' }); else closeSheet();
+    } catch (e) {
+      setReceiveError((e as Error).message);
+    }
+  };
 
   return (
     <Sheet title={`Tushdi: ${x.source}`} footer={<SaveButton onClick={save} tone="success">Tasdiqlash</SaveButton>}>
@@ -758,6 +817,8 @@ export function SheetHost() {
     case 'payBill': return <PayBillForm key={key} id={spec.id} />;
     case 'safeToSpend': return <SafeToSpendInfo key={key} />;
     case 'categoryTx': return <CategoryTxSheet key={key} categoryId={spec.categoryId} month={spec.month} />;
+    case 'plan': return <PlanSheet key={key} />;
+    case 'distribute': return <DistributeSheet key={key} />;
   }
 }
 

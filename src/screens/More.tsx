@@ -7,6 +7,7 @@ import { CURRENCIES, currencySymbol, currentMonth, dayTitle, fullDate, money, pl
 import { ACCOUNT_TYPE_NAMES } from '../domain/defaults';
 import { buildItems, ItemList } from './Transactions';
 import { runReminderAction } from './reminderActions';
+import { CardEnvelope } from './Cards';
 import type { ID } from '../domain/types';
 
 export function More() {
@@ -21,6 +22,8 @@ export function More() {
         <Row icon="📄" title="Hisobotlarni yuklab olish" subtitle="PDF va Excel" chevron onClick={() => push({ name: 'reports' })} />
       </List>
       <List title="Pul">
+        <Row icon="🗂️" title="Mening rejam" subtitle="Kartalar bo‘yicha taqsimot va qoidalar" chevron onClick={() => openSheet({ type: 'plan' })} />
+        <Row icon="💸" title="Pulni taqsimlash" subtitle="Maoshni kartalarga o‘tkazish" chevron onClick={() => openSheet({ type: 'distribute' })} />
         <Row icon="💰" title="Hisoblar" subtitle="Naqd va kartalar" right={<span className="tabular font-semibold">{short(L.totalMoney)}</span>} chevron onClick={() => push({ name: 'accounts' })} />
         <Row icon="💳" title="Qarzlar" right={<span className="tabular font-semibold text-orange-600">{short(L.totalDebt)}</span>} chevron onClick={() => push({ name: 'debts' })} />
         <Row icon="📥" title="Kutilgan kirim" subtitle="Maosh jadvali va Coming Soon" chevron onClick={() => push({ name: 'income' })} />
@@ -75,6 +78,7 @@ export function AccountDetail({ id }: { id: ID }) {
         <p className={cx('tabular text-[34px] font-extrabold', L.balance(a) < 0 && 'text-rose-600')}>{money(L.balance(a))}</p>
         <p className="text-[13px] text-slate-500">Boshlang‘ich: {plain(a.initialBalance)}</p>
       </Card>
+      {(a.plan || a.strict || L.cardCategories(a.id).length > 0) && <CardEnvelope st={L.cardStatus(a, currentMonth(), today())} L={L} />}
       {items.length ? <ItemList items={items} /> : <Empty icon="🧾" title="Hali harakat yo‘q" />}
     </Screen>
   );

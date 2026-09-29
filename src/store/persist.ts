@@ -15,7 +15,7 @@ export const LEGACY_KEY = 'budget-manager.v1';
 const DB_NAME = 'budget-manager';
 const DB_VERSION = 1;
 
-export type SnapshotReason = 'daily' | 'manual' | 'before-import' | 'before-restore' | 'before-reset' | 'v1-archive';
+export type SnapshotReason = 'daily' | 'manual' | 'before-import' | 'before-restore' | 'before-reset' | 'before-setup' | 'v1-archive';
 
 export interface Snapshot {
   id: string;

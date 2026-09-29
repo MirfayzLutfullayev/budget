@@ -208,7 +208,7 @@ describe('Safe to Spend (11, 18, 19, 35-bo‘lim)', () => {
   it('Total − rejali xaridlar − majburiy to‘lovlar', () => {
     A.savePlanned(s, { name: 'Creatine', amount: 300_000, date: null, categoryId: cat('Sport').id, note: '' });
     A.savePlanned(s, { name: 'Charger', amount: 200_000, date: null, categoryId: cat('Shaxsiy').id, note: '' });
-    A.saveBill(s, { name: 'Ijara', amount: 600_000, categoryId: cat('Ijara').id, accountId: s.accounts[3].id, day: 28 });
+    A.saveBill(s, { name: 'Ijara', amount: 600_000, categoryId: cat('Ijara').id, accountId: s.accounts[3].id, day: 28, startDate: `${currentMonth()}-01` });
     const d = A.saveDebt(s, { name: 'TBC', startingBalance: 10_500_000, minimumPayment: 900_000, dueDay: 11 });
     const safe = L().safeToSpend(today());
     expect(safe.total).toBe(4_500_000);
@@ -223,6 +223,15 @@ describe('Safe to Spend (11, 18, 19, 35-bo‘lim)', () => {
     expect(after.required).toBe(500_000);
     expect(after.value).toBe(3_500_000 - 500_000 - 500_000);
     expect(() => A.payBill(s, s.bills[0].id, { amount: 600_000, accountId: s.accounts[3].id, date: today(), month: currentMonth() })).toThrow();
+  });
+
+  it('Majburiy to‘lov qo‘shilishidan oldingi sanasi bu oy talab qilinmaydi (soxta «kechikdi» yo‘q)', () => {
+    A.saveBill(s, { name: 'Oilaga', amount: 1_200_000, categoryId: cat('Oila').id, accountId: null, day: 1, startDate: `${currentMonth()}-02` });
+    expect(L().requiredUpcoming(`${currentMonth()}-20`)).toEqual([]);
+    expect(L().reminders(`${currentMonth()}-20`).some(r => r.id.startsWith('bill-'))).toBe(false);
+    // Keyingi oydan boshlab talab qilinadi
+    const next = addMonths(currentMonth(), 1);
+    expect(L().requiredUpcoming(`${next}-05`).map(r => r.amount)).toEqual([1_200_000]);
   });
 
   it('Rejali xarid: Purchased → xarajat yaratiladi, reja yopiladi; Cancelled → rezervdan chiqadi', () => {

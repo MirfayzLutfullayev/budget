@@ -15,6 +15,12 @@ export interface Account {
   last4: string;
   isActive: boolean;
   sort: number;
+  /** Karta vazifasi, masalan "Oziq-ovqat, yo‘l, telefon". */
+  purpose?: string;
+  /** Har oy shu kartaga ajratiladigan summa (taqsimlashda ishlatiladi). */
+  plan?: number;
+  /** Qat'iy karta: faqat o'ziga biriktirilgan kategoriyalar uchun ishlatiladi. */
+  strict?: boolean;
 }
 
 /**
@@ -36,6 +42,10 @@ export interface Category {
   color: string;
   isActive: boolean;
   sort: number;
+  /** Qaysi karta hisobidan ishlatiladi (karta qoidasi). */
+  accountId?: ID | null;
+  /** Kunlik limit; 0 yoki yo'q — kunlik limit yo'q. */
+  dailyLimit?: number;
 }
 
 export interface Transaction {
@@ -123,6 +133,8 @@ export interface Bill {
   accountId: ID | null;
   day: number;
   isActive: boolean;
+  /** Qo'shilgan sana — undan oldingi to'lov sanalari talab qilinmaydi. */
+  startDate?: string;
 }
 
 export type PlannedStatus = 'planned' | 'purchased' | 'cancelled';
