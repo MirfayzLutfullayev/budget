@@ -1,43 +1,61 @@
-# Budget Manager (PWA)
+# Budget Manager
 
-Shaxsiy budget ilovasi: daromad, xarajat, oylik budget, kartalar, qarzlar, emergency va sinking fondlar, takroriy va rejali to‘lovlar, statistika.
-
-- Internetsiz ishlaydi (service worker)
-- Ma’lumotlar faqat telefonda saqlanadi (`localStorage`) — server, login, tashqi kutubxona yo‘q
-- Hech qanday summa kodda yo‘q: hammasi ilova ichida kiritiladi va o‘zgartiriladi
+Shaxsiy kirim-chiqim va budjet ilovasi (PWA).
 
 **Ilova:** https://mirfayzlutfullayev.github.io/budget/
 
+> Foydalanuvchi hisob-kitob qilmaydi. Faqat pul kirganini yoki chiqqanini kiritadi — qolganini ilova o‘zi hisoblaydi.
+
 ## iPhone’ga o‘rnatish
 
-1. Safari’da https://mirfayzlutfullayev.github.io/budget/ ni oching
-2. Pastdagi **Ulashish** (⬆︎) → **Add to Home Screen / На экран «Домой»**
-3. Ekrandagi **Budget** ikonkasidan oching
+1. **Safari**’da yuqoridagi manzilni oching
+2. **Ulashish** (⬆︎) → **Add to Home Screen / На экран «Домой»**
+3. Doim **ekrandagi ikonkadan** oching (Safari va ekrandagi ilova ma’lumotlari alohida saqlanadi)
 
-## Zaxira
+## Imkoniyatlar
 
-Ma’lumotlar telefon brauzerida saqlanadi. Ilovani ekrandan o‘chirsangiz yoki Safari ma’lumotlarini tozalasangiz, ular yo‘qoladi. Vaqti-vaqti bilan **Sozlamalar → Zaxira nusxa olish** orqali JSON faylni iCloud Drive’ga saqlang. Tiklash: **Sozlamalar → Zaxiradan tiklash**.
+- **Asosiy ekran:** Total Money, Safe to Spend, kirim/chiqim, tejaldi/oshib ketdi, budjet, qarz, Coming Soon, eslatmalar
+- **Tez kiritish:** `+` → Chiqim → summa → kategoriya → Saqlash (oxirgi hisob avtomatik tanlanadi)
+- Hisoblar (naqd, karta), o‘tkazmalar (xarajat emas), qarzlar va to‘lovlar
+- Oylik budjet, limitlar, budjet va haqiqat
+- Kutilgan kirim (Expected → Received), rejali xaridlar (Planned → Purchased / Cancelled), majburiy to‘lovlar
+- Statistika: kirim va chiqim, kategoriyalar (bosilganda tranzaksiyalar), budjet va haqiqat, qarz dinamikasi
+- **Hisobotlar:** oy / yil / ixtiyoriy davr bo‘yicha **PDF** va **Excel**
+- **Eslatmalar:** ilova ichida + iPhone **Kalendariga** (.ics) — ilova yopiq bo‘lsa ham telefon eslatadi
+- **Qanday hisoblanadi:** barcha qoidalar sizning raqamlaringiz bilan
 
-## Tuzilma
+## Ma’lumotlarni yo‘qotmaslik
+
+| Himoya | Nima qiladi |
+|---|---|
+| Ikki joyda saqlash | IndexedDB + localStorage; biri buzilsa ikkinchisidan tiklanadi va darhol qayta yoziladi |
+| Avtomatik nusxalar | Har kuni + tiklash/import/o‘chirishdan oldin; 14 kun saqlanadi, istalganiga qaytish mumkin |
+| Doimiy saqlash | Brauzerdan `persistent storage` so‘raladi |
+| Bekor qilish | O‘chirgandan keyin 6 soniya ichida «Bekor qilish» |
+| Zaxira fayl | JSON → iCloud Drive; har N kunda eslatadi; «Fayldan tiklash» |
+| Himoyalangan o‘chirish | Tranzaksiyasi bor hisob/kategoriya/qarzni o‘chirib bo‘lmaydi (faqat yashiriladi) |
+| Xavfsiz yuklash | Yuklashda xato bo‘lsa ilova ochilmaydi — bo‘sh holat eski ma’lumot ustidan yozilmaydi |
+| 1-versiyadan ko‘chirish | Eski ma’lumot avtomatik ko‘chiriladi, asl nusxasi arxivda umrbod saqlanadi |
+
+## Texnologiya
+
+React · TypeScript · Vite · Tailwind CSS · Recharts · vite-plugin-pwa · jsPDF · SheetJS · Vitest
 
 ```
-index.html, manifest.webmanifest, sw.js
-css/app.css
-js/util.js     pul formatlash, sanalar
-js/engine.js   barcha hisob-kitoblar (faqat o‘qiydi)
-js/store.js    ma’lumotlar va o‘zgartirish amallari
-js/charts.js   SVG diagrammalar
-js/ui.js       ekranlar, formalar, hodisalar
-js/app.js      ishga tushirish
-test/          node testlari
+src/domain/    types, engine (barcha hisob-kitob), actions (o‘zgartirish + validatsiya), migrate
+src/store/     persist (IndexedDB + localStorage + nusxalar), store, ui (navigatsiya, oynalar, xabarlar)
+src/lib/       format, reports (PDF/Excel), ics (kalendar), share
+src/screens/   Home, Transactions, Budget, Stats, More, Data, Onboarding
+src/sheets/    barcha formalar
 ```
 
-## Testlar
+## Ishlab chiqish
 
 ```
-node --test test/finance.test.js
+npm install
+npm run dev      # lokal
+npm test         # testlar
+npm run build    # tip tekshiruvi + build
 ```
 
-## Yangilash
-
-Kodni o‘zgartirgandan keyin `sw.js` dagi `VERSION`ni oshiring — telefonlar yangi versiyani oladi.
+`main`’ga push qilinganda GitHub Actions testlarni o‘tkazadi va o‘tsa — saytni yangilaydi.
